@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# Переменные
+VNCPassword=""
+user=""
+
+echo -n "Введите пароль от VNC: "
+read VNCPassword
+
+echo -n "Введите имя пользователя в домене medkirov.wan(или оставьте пустым если не хотите настраивать RDP): "
+read user
+
+cp /etc/gdm/PreSession/Default /etc/gdm/PreSession/Default.backup
+
+if [[ $user != "" ]] 
+then
+	echo "Настройка rdp соединения"
+	serverKmis=0
+	echo -n "Введите сервер по умолчанию(10.74.6.249 или 10.74.6.248): "
+	read serverKmis
+	mkdir -p /home/user/.local/share/remmina/
+	if [[ $serverKmis != 0 ]]
+	then
+		sed -e "s/^name=/name=МИС И КМИС/" -e "s/^username=/username=$user/" -e "s/^server=/server=$serverKmis/" rdp.remmina > rdp.remmina.tmp
+		mv "./rdp.remmina.tmp" "/home/user/.local/share/remmina/rdp.remmina"
+		chown -R user:user "/home/user/.local/share/remmina/"
+		echo "Успешно"
+	else
+		echo "Подключения к RDP не созданы"	
+	fi
+	cp Remmina.desktop /home/user/Рабочий\ стол/Удаленный\ рабочий\ стол.desktop
+	chown -R user:user /home/user/Рабочий\ стол/Удаленный\ рабочий\ стол.desktop
+	
+fi
+
+echo "Включение входа в систему без пароля"
+cp /etc/gdm/custom.conf /etc/gdm/custom.conf.backup
+sed -i 's!\[daemon\]![daemon]\nAutomaticLogin=user\nAutomaticLoginEnable=True!' /etc/gdm/custom.conf
+echo "Успешно"
+
+echo "Включение подключения к сети при входе в систему"
+cp /etc/sysconfig/network-scripts/ifcfg-enp4s0 /etc/sysconfig/network-scripts/ifcfg-enp4s0.backup
+sed -i 's/ONBOOT=no/ONBOOT=yes/' /etc/sysconfig/network-scripts/ifcfg-enp4s0
+systemctl restart NetworkManager
+echo "Успешно"
+
+echo "Отключение информационного сообщения"
+sed -i 's!^/usr/bin/zenity --warning --text \"\$TEXTMSG\" --no-wrap!\#/usr/bin/zenity --warning --text \"\$TEXTMSG\" --no-wrap!' /etc/gdm/PreSession/Default
+echo "Успешно"
+
+echo "Установка ntp сервиса, для подстройки времени"
+yum install ntp
+systemctl enable ntpd.service
+echo "Успешно"
+
+echo "Установка и настройка VNC"
+yum -y install x11vnc
+x11vnc -storepasswd $VNCPassword /etc/vncpasswd
+cp x11vnc.service /lib/systemd/system/x11vnc.service
+systemctl daemon-reload
+systemctl enable x11vnc.service
+systemctl start x11vnc.service
+echo "Успешно"
+
+echo "Установка пакета hplip"
+yum -y install hplip-gui
+echo "Успешно"
+
+echo "Установка и настройка утилит для шаринга локальных принтеров"
+yum -y install cups-ipptool
+yum -y install nmap
+sed -i 's/^BrowseLocalProtocols dnssd$/BrowseLocalProtocols dnssd cups/' /etc/cups/cupsd.conf
+systemctl restart cups
+echo "Успешно"

@@ -1,0 +1,8 @@
+[Unit]
+Description=Start x11vnc at startup.
+After=multi-user.target
+[Service]
+Type=simple
+ExecStart=/usr/bin/x11vnc --reopen -nomodtweak -capslock -forever -rfbauth /etc/vncpasswd
+[Install]
+WantedBy=multi-user.target
